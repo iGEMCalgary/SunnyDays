@@ -113,16 +113,9 @@ while headerIndex != 0:
 print("Please enter in how many days in advance you wish to forecast data:")
 daysDifference = getUserInput(1, 365, "Enter in a number between 1 and 365:")
 
-#Get how many days in the past to use for extra input data dimensionality
-print("Please enter in how many days in the past you wish to draw extra input data dimensionality from:")
-daysPreviousDifference = getUserInput(0, 365, "Enter in a number between 0 and 365:")
-
 #Set whether or not to use saved models
 print("Enter in 1 if you wish to load existing model h5 files, and 2 if any new models must be created.")
 loadFilesBool = getUserInput(1, 2, "Enter in a number between 1 and 2:")
-
-
-
 
 #Returns a probability value from daysDifference in the future
 def forecastProbabilityData(dataframe, header, currentIndex, daysDifference):
@@ -152,12 +145,8 @@ def normalize(x, trainStats):
 		if(std == 0.0):
 			tempStdList.append(1)
 		else:
-			tempStdList.append(std)		
+			tempStdList.append(std)
 	return (x - trainStats['mean']) / tempStdList
-
-#Get the original data list from its normalized version list
-def deNormalize(x, trainStats, targetHeaderIndex):
-	return [a * trainStats['std'][targetHeaderIndex] + trainStats['mean'][targetHeaderIndex] for a in x]
 
 #Build the model:
 def buildModel():
@@ -217,71 +206,6 @@ def plotHistory(history, targetHeader):
 	plt.legend()
 	
 	#Show the graphs
-	plt.show()
-	plt.close()
-
-#Plot the test labels vs the test predictions
-def plotPredVsTrueScatter(testLabels, testPredictions):
-	plt.scatter(testLabels, testPredictions)
-	plt.xlabel("True Values [{}]".format(targetHeader).replace(".", " "))
-	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
-	plt.axis('equal')
-	plt.axis('square')	
-	
-	xRange = (plt.xlim()[1] - plt.ylim()[0])
-	yRange = (plt.ylim()[1] - plt.ylim()[0])
-	
-	plt.xlim(plt.xlim()[0] - xRange*0.05, plt.xlim()[1] + xRange*0.05)
-	plt.ylim(plt.ylim()[0] - yRange*0.05, plt.ylim()[1] + yRange*0.05)
-	#Plots the linear line of best fit
-	_ = plt.plot([plt.xlim()[0] - xRange*0.05, plt.xlim()[1] + xRange*0.05],
-				 [plt.ylim()[0] - yRange*0.05, plt.ylim()[1] + yRange*0.05], color='green')	
-	b, m = polyfit(testLabels, testPredictions, 1)
-	print("b = {}, m = {} for linear regression of predicted values vs true values".format(b, m))
-	plt.plot(testLabels, b+m*testLabels, '-', color='red')
-	plt.show()
-	plt.close()
-
-#Plot the error distribution of some test predictions
-def plotErrDistr(testPredictions, testLabels):
-	error = testPredictions - testLabels
-	plt.hist(error, bins = 40, rwidth = 0.92)
-	plt.xlabel("Prediction Error (Prediction - True Value)[{}]".format(targetHeader.replace(".", " ")))
-	_ = plt.ylabel("Count (No. of Predictions)")
-	plt.show()
-	plt.close()
-
-#Plot forecast data for each station
-def plotStationForecastData(futurePredictionsList, recentDateStationList, stationNameList):
-	for futurePrediction, recentDate, stationName in zip(futurePredictionsList, recentDateStationList, stationNameList):
-		plt.plot(recentDate, futurePrediction, label = stationName, linewidth = 1)
-	
-	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
-	plt.xticks(rotation = 60)
-	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
-	plt.legend()
-	
-	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
-	
-	plt.show()
-	plt.close()
-
-#Plot forecast data for one list of values, typically the average of the stations.
-def plotStationAverageForecastData(predictionAveList, recentDate, label):
-	plt.figure(dpi = 120)
-	plt.xlabel('Date')
-	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
-	
-	plt.plot(recentDate, predictionAveList, label = label, linewidth = 1)
-	
-	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
-	plt.xticks(rotation = 60)
-	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
-	plt.legend()
-	
-	
-	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
-	
 	plt.show()
 	plt.close()
 
@@ -348,7 +272,6 @@ townshipLocationData = {'Blackie AGCM':[50.5458, -113.6403, 1019.00],
 for targetHeaderIndex in originalTargetHeaderIndexList:
 	print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~CREATING A MODEL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 	startTime = time.time()
-	print("Starting secondary preprocessing...")
 	
 	#Reset the dataframe
 	weatherDataframe = originalWeatherDataframe.copy()
@@ -358,7 +281,7 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 	
 	#Create the previous data columns (i days in the past)
 	#Extremely roughly, 5 previous days can be processed in a minute.
-	
+	daysPreviousDifference = 30
 	nonDuplicateHeaders = ['Station Name']
 	for i in range(daysPreviousDifference):
 		if i % 5 == 0:
@@ -396,7 +319,6 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 
 	targetHeader = 'Forecasted.' + weatherDataframeHeaders[targetHeaderIndex]
 	weatherDataframe[targetHeader] = tempList
-	
 
 	#Salvage the recent rows that do not contain any data for the future model.
 	recentWeatherDataframe = weatherDataframe.loc[pd.isnull(weatherDataframe.loc[:, targetHeader]), : ]	
@@ -411,75 +333,36 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 	#testFrame contains no rows from trainFrame
 	trainFrame = weatherDataframe.sample(frac = 0.8, random_state = int(math.floor(time.time() % 10)))
 	testFrame = weatherDataframe.drop(trainFrame.index)
-	
-	#print(trainFrame)
-	#print(testFrame)
-	
-	
-	
-	
+
 	
 	#Get statistics for each header except for the target
 	#And any nonnumerical column
 	#(We want to use these to normalize the inputs and not the output)
 	trainStats = trainFrame.describe()
-	
-	#Get the index of the target header in the description
-	targetHeaderDescribeIndex = list(trainStats.columns).index(targetHeader)
-	
-	#trainStats.pop(targetHeader)
-	
-	recentStats = trainStats.copy()
-	recentStats.pop(targetHeader)
-	recentStats = recentStats.transpose()
-	
+	trainStats.pop(targetHeader)
 	trainStats = trainStats.transpose()
-	
-	
-	
-	print(trainStats)
-	print(trainFrame)
+
+	#print(trainStats)
+	#print(trainFrame)
 	#print(testFrame)
 
-	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-	#normalize datasets
-	normedTrainFrame = normalize(trainFrame, trainStats)
-	normedTestFrame = normalize(testFrame, trainStats)
-
-	recentWeatherDataframe.pop(targetHeader)
-	normedFutureFrame = normalize(recentWeatherDataframe, recentStats)
-
-	for header in list(normedTrainFrame.columns):
-		print("REEEEEE: ", header, ": ", max(normedTrainFrame[header]))
-		print("AAAAAAA: ", header, ": ", min(normedTrainFrame[header]))
-
-	#Split features from labels, all are normalized
+	#Split features from labels
 	trainLabels = trainFrame.pop(targetHeader)
 	testLabels = testFrame.pop(targetHeader)
+	recentWeatherDataframe.pop(targetHeader)
 	
 	#print(trainLabels)
 	#print(testLabels)
-	
-	print("IOSDOIFWEO FASOIDF ASODIJF ASDCIULWEAB IASDU NCAIEWU FIWUL ADSLKASNCKAWEIU ALWE FASDFO IASD")
 
-	
-	print(trainLabels)
-	print(trainStats)
-	#print(targetHeaderDescribeIndex)
-	
-	print(deNormalize(trainLabels, trainStats, targetHeaderDescribeIndex))
-	print(deNormalize(testLabels, trainStats, targetHeaderDescribeIndex))
-	print("GGHIOSGIOGIOSFGAOISDJFOIASJDFOIASJDF OAISJDFOISJDV OSDIJFOIASDFOISAJ FOSIDJF ASD ASDF A")
-	
-	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
+	normedTrainFrame = normalize(trainFrame, trainStats)
+	normedTestFrame = normalize(testFrame, trainStats)
+	normedFutureFrame = normalize(recentWeatherDataframe, trainStats)
 	
 	#print(normedTrainFrame)
 
 	endTime = time.time()
 	print("\nSecondary preprocessing is complete. \nTime: {} minutes, {} seconds.".format(math.floor((endTime - startTime)/60.0), (endTime - startTime) % 60))
-	"""
+
 	#If a file exists and the setting is to load files, load it as an HDF5 file
 	#Recreate the exact same model, including weights and optimizer.
 	modelFilePath = 'WeatherModels7\weatherModel_' + targetHeader.replace('.','_') + '.h5'
@@ -535,12 +418,12 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 	testPredictions = weatherModel.predict(normedTestFrame).flatten()
 
 	#Print the most egregious model predictions
-	#These will be predictions with an AE > 5*MAE
-	print("\nThe predictions with an AE > 5*MAE:")
+	#These will be predictions with an AE > 2*MAE
+	print("\nThe predictions with an AE > 2*MAE:")
 	
 	egregiousPredictionsCount = 0
 	for i in range(len(testPredictions)):
-		if i in testLabels and abs(testPredictions[i] - testLabels[i]) > mae * 5 :
+		if i in testLabels and abs(testPredictions[i] - testLabels[i]) > mae * 2 :
 			egregiousPredictionsCount = egregiousPredictionsCount + 1
 			print("i = {}: 	 prediction = {:5.3f},	true value = {:5.3f},	MAE = {:5.3f},	MAE multiple = {:5.3f}".format(
 				i, testPredictions[i], testLabels[i], abs(testPredictions[i] - testLabels[i]), abs(testPredictions[i] - testLabels[i])/mae))
@@ -548,13 +431,39 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 		  egregiousPredictionsCount, len(testPredictions), egregiousPredictionsCount/len(testPredictions)*100))
 
 	#Plot the predictions vs the true values of the test set
-	plotPredVsTrueScatter(testLabels, testPredictions)
+	plt.scatter(testLabels, testPredictions)
+	plt.xlabel("True Values [{}]".format(targetHeader).replace(".", " "))
+	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
+	plt.axis('equal')
+	plt.axis('square')	
 	
+	xRange = (plt.xlim()[1] - plt.ylim()[0])
+	yRange = (plt.ylim()[1] - plt.ylim()[0])
+	
+	plt.xlim(plt.xlim()[0] - xRange*0.05, plt.xlim()[1] + xRange*0.05)
+	plt.ylim(plt.ylim()[0] - yRange*0.05, plt.ylim()[1] + yRange*0.05)
+	#Plots the linear line of best fit
+	_ = plt.plot([plt.xlim()[0] - xRange*0.05, plt.xlim()[1] + xRange*0.05],
+				 [plt.ylim()[0] - yRange*0.05, plt.ylim()[1] + yRange*0.05], color='green')	
+	b, m = polyfit(testLabels, testPredictions, 1)
+	print("b = {}, m = {} for linear regression of predicted values vs true values".format(b, m))
+	plt.plot(testLabels, b+m*testLabels, '-', color='red')
+	plt.show()
+	plt.close()
 
 	#Plot error distribution
-	plotErrDistr(testPredictions, testLabels)
-	
+	error = testPredictions - testLabels
+	plt.hist(error, bins = 40, rwidth = 0.92)
+	plt.xlabel("Prediction Error (Prediction - True Value)[{}]".format(targetHeader.replace(".", " ")))
+	_ = plt.ylabel("Count (No. of Predictions)")
+	plt.show()
+	plt.close()
+
 	print()
+
+
+
+
 
 
 	#Create a prediction model using the most recent data.
@@ -599,6 +508,7 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 		forecastedDateList = [convertDate(date, daysDifference) for date in recentDateStationList[i]]
 		recentDateStationList[i] = forecastedDateList
 	
+	
 	plt.figure(dpi = 120)
 	plt.xlabel('Date')
 	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
@@ -608,13 +518,25 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 						'Mossleigh AGCM',
 						'Queenstown',
 						'Travers AGCM']
-						
-	plotStationForecastData(futurePredictionsList, recentDateStationList, stationNameList)		
+	for futurePrediction, recentDate, stationName in zip(futurePredictionsList, recentDateStationList, stationNameList):
+		plt.plot(recentDate, futurePrediction, label = stationName, linewidth = 1)
 	
+	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
+	plt.xticks(rotation = 60)
+	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
+	plt.legend()
+	
+	
+	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
+	
+	plt.show()
+	plt.close()
 	
 	
 	#Create the average forecast graph
-	
+	plt.figure(dpi = 120)
+	plt.xlabel('Date')
+	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
 	
 
 	predictionAveList = [0 for i in range(len(futurePredictionsList[0]))]
@@ -623,10 +545,18 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 			predictionAveList[i] = predictionAveList[i] + futurePrediction[i]
 	predictionAveList = [prediction/len(stationNameList) for prediction in predictionAveList]
 
-	#Plot the average forecast graph
-	label = 'Average of Stations'
-	plotStationAverageForecastData(predictionAveList, recentDate, label)
+	plt.plot(recentDate, predictionAveList, label = 'Average of Stations', linewidth = 1)
 	
+	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
+	plt.xticks(rotation = 60)
+	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
+	plt.legend()
+	
+	
+	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
+	
+	plt.show()
+	plt.close()
 
 	#Predict Frost Days
 	predictionFrostList = []
@@ -636,39 +566,120 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 		else:
 			predictionFrostList.append(0)
 			
-	label = 'Frost Occurance'		
-	plotStationAverageForecastData(predictionFrostList, recentDate, label)
+	plt.plot(recentDate, predictionFrostList, label = 'Frost Occurance', linewidth = 1)
+	
+	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
+	plt.xticks(rotation = 60)
+	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
+	plt.legend()
+	
+	
+	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
+	
+	plt.show()
+	plt.close()
+	
+	
+	
+	
 	
 	
 	#NOW WITH WACK ADJUSTMENT
 	#Plot the ADJUSTED predictions vs the true values of the test set
 	adjustedTestPredictions = [(1/m)*(prediction - b) for prediction in testPredictions]
-	
-	plotPredVsTrueScatter(adjustedTestPredictions, testLabels)
 	plt.scatter(testLabels, adjustedTestPredictions)
+	plt.xlabel("True Values [{}]".format(targetHeader).replace(".", " "))
+	plt.ylabel("Adjusted Predictions [{}]".format(targetHeader).replace(".", " "))
+	plt.axis('equal')
+	plt.axis('square')	
+	
+	xRange = (plt.xlim()[1] - plt.ylim()[0])
+	yRange = (plt.ylim()[1] - plt.ylim()[0])
+	
+	plt.xlim(plt.xlim()[0] - xRange*0.05, plt.xlim()[1] + xRange*0.05)
+	plt.ylim(plt.ylim()[0] - yRange*0.05, plt.ylim()[1] + yRange*0.05)
+	#Plots the linear line of best fit
+	_ = plt.plot([plt.xlim()[0] - xRange*0.05, plt.xlim()[1] + xRange*0.05],
+				 [plt.ylim()[0] - yRange*0.05, plt.ylim()[1] + yRange*0.05], color='green')	
+	b, m = polyfit(testLabels, adjustedTestPredictions, 1)
+	print("b = {}, m = {} for linear regression of predicted values vs true values".format(b, m))
+	plt.plot(testLabels, b+m*testLabels, '-', color='red')
+	plt.show()
+	plt.close()
 
 	#Plot error distribution
-	plotErrDistr(adjustedTestPredictions, testLabels)
+	error = adjustedTestPredictions - testLabels
+	plt.hist(error, bins = 40, rwidth = 0.92)
+	plt.xlabel("Prediction Error (Prediction - True Value)[{}]".format(targetHeader.replace(".", " ")))
+	_ = plt.ylabel("Count (No. of Predictions)")
+	plt.show()
+	plt.close()
+
 
 	#Create an ADJUSTED prediction model using the most recent data.
 	#Create 1 plot per station.
+	
+	
+	
+	
+	#Reconstruct a date column for the recentWeatherDataframe
+	
+	
+
+		
+	
 	adjustedFuturePredictionsList = []
 	for futurePrediction in futurePredictionsList:
 		adjustedFuturePredictionsList.append([(1/m)*(prediction - b) for prediction in futurePrediction])
-		
-	plotStationForecastData(adjustedFuturePredictionsList, recentDateStationList, stationNameList)
+	
+	plt.figure(dpi = 120)
+	plt.xlabel('Date')
+	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
+	
+	stationNameList = ['Blackie AGCM', 
+						'Champion AGDM',
+						'Mossleigh AGCM',
+						'Queenstown',
+						'Travers AGCM']
+	for futurePrediction, recentDate, stationName in zip(adjustedFuturePredictionsList, recentDateStationList, stationNameList):
+		plt.plot(recentDate, futurePrediction, label = stationName, linewidth = 1)
+	
+	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
+	plt.xticks(rotation = 60)
+	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
+	plt.legend()
+	
+	
+	plt.title("Adjusted Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
+	
+	plt.show()
+	plt.close()
+	
 	
 	#Create the average forecast graph
+	plt.figure(dpi = 120)
+	plt.xlabel('Date')
+	plt.ylabel("Predictions [{}]".format(targetHeader).replace(".", " "))
 	
+
 	predictionAveList = [0 for i in range(len(adjustedFuturePredictionsList[0]))]
 	for futurePrediction in adjustedFuturePredictionsList:
 		for i in range(len(futurePrediction)):
 			predictionAveList[i] = predictionAveList[i] + futurePrediction[i]
 	predictionAveList = [prediction/len(stationNameList) for prediction in predictionAveList]
-	
-	label = 'Adjusted Average of Stations'
-	plotStationAverageForecastData(predictionAveList, recentDate, label)
 
+	plt.plot(recentDate, predictionAveList, label = 'Average of Stations', linewidth = 1)
+	
+	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
+	plt.xticks(rotation = 60)
+	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
+	plt.legend()
+	
+	
+	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
+	
+	plt.show()
+	plt.close()
 
 	#Predict Frost Days
 	predictionFrostList = []
@@ -677,7 +688,16 @@ for targetHeaderIndex in originalTargetHeaderIndexList:
 			predictionFrostList.append(1)
 		else:
 			predictionFrostList.append(0)
+			
+	plt.plot(recentDate, predictionFrostList, label = 'Frost Occurance', linewidth = 1)
 	
-	label = 'Frost Occurance'		
-	plotStationAverageForecastData(predictionFrostList, recentDate, label)
-	"""
+	plt.gca().grid(True, linewidth = 0.6, linestyle=':')
+	plt.xticks(rotation = 60)
+	plt.subplots_adjust(left = 0.12, right = 0.999, top = 0.95, bottom = 0.15)
+	plt.legend()
+	
+	
+	plt.title("Forecasted Data for Weather Stations for the Future {} Days".format(daysDifference))
+	
+	plt.show()
+	plt.close()
